@@ -21,7 +21,11 @@ class ContextExtractor:
     }
 
     # Intensity mappings
-    HIGH_INTENSITY = ["gaming", "render", "rendering", "compile", "docker", "ml", "4k export", "heavy", "intense", "extreme"]
+    HIGH_INTENSITY = [
+        "gaming", "game", "games", "render", "rendering", "compile", "docker", "ml",
+        "4k export", "4k", "premiere", "davinci", "timeline", "video editing",
+        "heavy", "intense", "extreme", "benchmark", "stress"
+    ]
     LOW_INTENSITY = ["browsing", "typing", "notes", "zoom", "slack", "streaming", "netflix", "unplugged", "lightweight", "casual"]
 
     # Environment cues

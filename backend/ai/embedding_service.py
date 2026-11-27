@@ -1,4 +1,4 @@
-"""Dense Semantic Vector Embedding Service"""
+"""Vector Embedding Service supporting Sentence Transformers and Deterministic Fallback"""
 import math
 import hashlib
 from typing import List, Optional
@@ -9,9 +9,16 @@ _st_model = None
 
 class EmbeddingService:
     """
-    Computes dense 384-dimensional vector embeddings for review texts and aspect clauses.
-    Implements fast deterministic 384-d semantic projection by default, and loads
-    SentenceTransformers when USE_LOCAL_TRANSFORMERS is enabled.
+    Generates 384-dimensional vector embeddings for review texts and aspect clauses.
+    
+    Modes:
+    1. Semantic Embedding (USE_LOCAL_TRANSFORMERS=True):
+       Uses Hugging Face Sentence Transformers ('all-MiniLM-L6-v2') to produce
+       true semantic embeddings capturing contextual meaning and synonymy.
+    2. Deterministic Hash Projection Fallback (USE_LOCAL_TRANSFORMERS=False):
+       Uses multi-seed SHA-256 hashing to produce normalized 384-d pseudo-vectors.
+       This provides sub-millisecond offline execution for development without
+       requiring heavy deep learning model downloads or PyTorch initialization.
     """
     def __init__(self, model_name: str = settings.EMBEDDING_MODEL_NAME, dimension: int = settings.VECTOR_DIMENSION):
         self.model_name = model_name
@@ -24,14 +31,18 @@ class EmbeddingService:
         if _st_model is None:
             try:
                 from sentence_transformers import SentenceTransformer
-                _st_model = SentenceTransformer(self.model_name, local_files_only=True)
-                logger.info(f"Loaded SentenceTransformer model '{self.model_name}' from local cache.")
-            except Exception:
+                try:
+                    _st_model = SentenceTransformer(self.model_name, local_files_only=True)
+                except Exception:
+                    _st_model = SentenceTransformer(self.model_name)
+                logger.info(f"Loaded SentenceTransformer semantic model '{self.model_name}'.")
+            except Exception as e:
+                logger.warning(f"Could not load SentenceTransformer: {e}")
                 _st_model = False
         return _st_model
 
     def embed_text(self, text: str) -> List[float]:
-        """Returns 384-d normalized vector for given text."""
+        """Returns normalized 384-d vector for given text."""
         cleaned = text.strip()
         model = self._get_st_model()
         if model:
@@ -41,14 +52,14 @@ class EmbeddingService:
             except Exception as e:
                 logger.error(f"Error encoding with SentenceTransformer: {e}")
 
-        # Instant, deterministic 384-dimensional normalized vector projection
+        # Deterministic 384-dimensional normalized hash projection fallback
         return self._deterministic_vector(cleaned)
 
     def _deterministic_vector(self, text: str) -> List[float]:
         """
-        Creates a high-dispersion, normalized 384-dimensional embedding vector
-        using multi-seed hashing. Guarantees deterministic, reproducible vector
-        similarity with sub-millisecond execution.
+        Creates a normalized 384-dimensional deterministic vector using multi-seed
+        SHA-256 hashing. Note: This is an offline pseudo-vector projection, NOT a
+        semantic embedding.
         """
         vec = []
         for i in range(self.dimension):
